@@ -5,8 +5,8 @@
 exports.up = function (knex) {
   return Promise.all([
     knex.schema.createTable("models", (table) => {
-      table.increments("uuid");
-      table.string("id", 50);
+      table.increments("uuid").primary();
+      table.string("id", 50).notNullable();
       table.string("name", 50);
       table.string("modality", 50);
       table.string("description", 1024);

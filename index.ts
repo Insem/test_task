@@ -1,7 +1,7 @@
 import * as express from "express";
 import * as knex from "knex";
 import { CronJob } from "cron";
-
+import type { ErrorRequestHandler } from "express";
 const app = express();
 const port = 8080;
 const TABLE = "models";
@@ -18,19 +18,16 @@ const pgsql = knex({
 });
 
 const job = CronJob.from({
-  //cronTime: "0 1 * * *",
-  cronTime: "*/1 * * * *",
+  cronTime: "0 1 * * *",
+  //cronTime: "*/1 * * * *",
   onTick: async function () {
     let response = await fetch(URL);
 
     if (response.ok) {
-      // если HTTP-статус в диапазоне 200-299
-      // получаем тело ответа (см. про этот метод ниже)
       let json = await response.json();
-      console.log(json);
       await putModels(json.data);
     } else {
-      alert("Ошибка HTTP: " + response.status);
+      console.error("Ошибка HTTP: " + response.status);
     }
   },
   start: true,
@@ -44,49 +41,85 @@ interface IModel {
   description: string;
 }
 app.use(express.json());
+app.use(function (err, _req, res, _next) {
+  res.status(err.status || 500);
+  res.json({ error: err });
+} as ErrorRequestHandler);
+
 app.get("/api/models", async (req, res): Promise<void> => {
   let result: Array<IModel> = await pgsql(TABLE).select("*");
 
+  res.status(200).send(result);
+});
+
+async function putModels(raw_models: any) {
+  //@ts-ignore
+  let models: Array<IModel> = raw_models.map((v) => ({
+    context_length: v.context_length,
+    id: v.id,
+    modality: v.architecture.modality,
+    name: v.name,
+    description: v.description,
+  }));
+  await pgsql(TABLE).insert(models);
+}
+
+app.post("/api/models", async (req, res): Promise<void> => {
+  if (!Array.isArray(req.body)) {
+    res.status(500).send("Please send array of models");
+  }
+  await putModels(req.body);
+  res.status(200).send();
+});
+
+app.get("/api/models/:id", async (req, res): Promise<void> => {
+  if (!req.params["id"] || req.params["id"] === "") {
+    res.status(500).send("Model need to have id for update");
+  }
+
+  let id: string = req.params["id"];
+  let result: Array<IModel> = await pgsql(TABLE).select("*").where("id", id);
+
   if (result.length == 0) {
-    res.status(500).send("Balance of user couldn't be less than 0");
+    res.status(500).send("Model not found");
     return;
   }
 
   res.status(200).send(result);
 });
 
-async function putModels(raw_models: Array<IModel>) {
-  let models: Array<IModel> = raw_models.map((v: IModel) => ({
-    context_length: v.context_length,
-    id: v.id,
-    modality: v.modality,
-    name: v.name,
-    description: v.description,
-  }));
-  console.log("--,odels", models);
-  await pgsql(TABLE).insert(models);
-}
+app.delete("/api/models/:id", async (req, res): Promise<void> => {
+  if (!req.params["id"] || req.params["id"] === "") {
+    res.status(500).send("Model need to have id for update");
+  }
 
-app.post("/api/models", async (req, res): Promise<void> => {
-  console.log("--,odels");
-  await putModels(req.body);
-  res.status(200);
+  let id: string = req.params["id"];
+  await pgsql(TABLE).where("id", id).delete();
+
+  res.status(200).send();
 });
 
 app.put("/api/models/:id", async (req, res): Promise<void> => {
-  console.log("--Put");
+  if (Array.isArray(req.body)) {
+    res.status(500).send("Please don't send array of models");
+  }
+  if (!req.params["id"] || req.params["id"] === "") {
+    res.status(500).send("Model need to have id for update");
+  }
   let id: string = req.params["id"];
   let model: IModel = {
     context_length: req.body.context_length,
     id: req.body.id,
-    modality: req.body.modality,
+    modality: req.body.architecture.modality,
     name: req.body.name,
     description: req.body.description,
   };
-  await pgsql(TABLE).where("id", id).delete();
-  await pgsql(TABLE).insert(model);
+  await Promise.all([
+    pgsql(TABLE).where("id", id).delete(),
+    pgsql(TABLE).insert(model),
+  ]);
 
-  res.status(200);
+  res.status(200).send();
 });
 
 app.listen(port, () => {
