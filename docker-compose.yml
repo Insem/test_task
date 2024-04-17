@@ -10,10 +10,10 @@ services:
       - POSTGRES_PASSWORD=task
       - POSTGRES_USER=task
       - POSTGRES_DB=task
-#  task:
-#    depends_on:
-#      - db
-#    build: .
-#    ports:
-#      - "8080:8080/tcp"
-#    restart: always
+  task:
+    depends_on:
+      - db
+    build: .
+    ports:
+      - "8080:8080/tcp"
+    restart: always

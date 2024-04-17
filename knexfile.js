@@ -26,7 +26,7 @@ module.exports = {
       database: "task",
       user: "task",
       password: "task",
-      host: "localhost",
+      host: "db",
       port: "5432",
     },
     pool: {
