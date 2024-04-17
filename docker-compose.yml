@@ -1,0 +1,19 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:14.9-alpine
+    restart: always
+    ports:
+      - "5432:5432/tcp"
+    environment:
+      - POSTGRES_PASSWORD=task
+      - POSTGRES_USER=task
+      - POSTGRES_DB=task
+#  task:
+#    depends_on:
+#      - db
+#    build: .
+#    ports:
+#      - "8080:8080/tcp"
+#    restart: always
